@@ -1,0 +1,44 @@
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        required: true
+        type: string
+      containerfile_path:
+        required: true
+        type: string
+      tags:
+        required: true
+        type: string
+
+jobs:
+  build-and-push:
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup qemu
+      uses: docker/setup-qemu-action@v3
+
+    - name: Buildah Action
+      id: build-image
+      uses: redhat-actions/buildah-build@v2
+      with:
+        image: ${{ github.repository_owner }}/${{ inputs.image_name }}
+        tags: ${{ inputs.tags }}
+        containerfiles: ${{ inputs.containerfile_path }}
+        archs: amd64, arm64
+        build-args: |
+          NUGET_USER=${{ github.actor }}
+          NUGET_PASSWORD=${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push ghcr.io
+      uses: redhat-actions/push-to-registry@v2
+      with:
+        image: ${{ steps.build-image.outputs.image }}
+        tags: ${{ steps.build-image.outputs.tags }}
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}

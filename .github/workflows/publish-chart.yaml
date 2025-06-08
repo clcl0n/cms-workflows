@@ -1,0 +1,37 @@
+on:
+  workflow_call:
+    inputs:
+      chart_version:
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Login to GitHub Container Registry
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Update Chart Version
+        run: |
+          # Update Chart.yaml with the tag version
+          sed -i "s/^version:.*/version: ${{ inputs.CHART_VERSION }}/" charts/Chart.yaml
+
+      - name: Package and Push Helm Chart
+        run: |
+          # Package the chart
+          helm package charts/
+          
+          # Get the chart name and version from Chart.yaml
+          CHART_NAME=$(helm show chart charts/ | grep '^name:' | awk '{print $2}')
+          
+          # Push to GitHub Container Registry
+          helm push ${CHART_NAME}-${{ inputs.CHART_VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
